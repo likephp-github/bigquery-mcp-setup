@@ -31,7 +31,7 @@ Claude 會透過 MCP Server 即時查詢你的 BigQuery 資料並回覆。
 ### 方式一：下載後執行（推薦）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/你的帳號/bigquery-mcp-setup/main/setup-bigquery-mcp.sh -o setup-bigquery-mcp.sh
+curl -fsSL https://raw.githubusercontent.com/likephp-github/bigquery-mcp-setup/main/setup-bigquery-mcp.sh -o setup-bigquery-mcp.sh
 chmod +x setup-bigquery-mcp.sh
 ./setup-bigquery-mcp.sh
 ```
@@ -39,7 +39,7 @@ chmod +x setup-bigquery-mcp.sh
 ### 方式二：git clone 後執行
 
 ```bash
-git clone https://github.com/你的帳號/bigquery-mcp-setup.git
+git clone https://github.com/likephp-github/bigquery-mcp-setup.git
 cd bigquery-mcp-setup
 chmod +x setup-bigquery-mcp.sh
 ./setup-bigquery-mcp.sh
