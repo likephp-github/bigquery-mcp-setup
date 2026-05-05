@@ -246,6 +246,7 @@ The backup file lives in the same directory, named `claude_desktop_config.json.b
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.12.0 | 2026-05-05 | Windows script messages translated to English to sidestep Windows PowerShell console mojibake (internal script version bumped to 2.0.0) |
 | v1.11.0 | 2026-05-05 | Windows script now performs OS platform and Windows version checks at startup (requires Windows 10+) |
 | v1.10.0 | 2026-05-05 | Fixed mojibake on Windows PowerShell 5.1: added UTF-8 BOM and forced console output encoding to UTF-8 |
 | v1.9.0 | 2026-05-05 | Added Windows 10/11 interactive installer (PowerShell) and dual-platform README |

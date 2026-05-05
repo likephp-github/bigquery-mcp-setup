@@ -246,6 +246,7 @@ notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| v1.12.0 | 2026-05-05 | Windows 腳本所有訊息改為英文，避免 Windows PowerShell 主控台中文亂碼（內部腳本版本升至 2.0.0） |
 | v1.11.0 | 2026-05-05 | Windows 腳本啟動時新增 OS 平台與 Windows 版本檢查（需 Windows 10 以上） |
 | v1.10.0 | 2026-05-05 | 修正 Windows PowerShell 5.1 中文亂碼：腳本加上 UTF-8 BOM 並強制設定主控台輸出編碼為 UTF-8 |
 | v1.9.0 | 2026-05-05 | 新增 Windows 10/11 互動式安裝腳本（PowerShell）與 README 雙平台說明 |

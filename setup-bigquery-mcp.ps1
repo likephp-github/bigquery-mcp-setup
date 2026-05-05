@@ -1,23 +1,23 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
-    BigQuery MCP Server 互動安裝腳本 for Windows
+    BigQuery MCP Server interactive installer for Windows
 .DESCRIPTION
-    引導使用者完成 Claude Desktop + BigQuery MCP 設定
-    版本：1.2.0  日期：2026-05-05
+    Guides the user through Claude Desktop + BigQuery MCP setup.
+    Version: 2.0.0  Date: 2026-05-05
 
 .NOTES
-    執行方式（二選一）：
+    How to run (pick one):
       powershell -ExecutionPolicy Bypass -File setup-bigquery-mcp.ps1
-    或先允許目前 session 執行腳本：
+    Or relax the policy for the current session first:
       Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
       .\setup-bigquery-mcp.ps1
 #>
 
-$SCRIPT_VERSION = "1.2.0"
+$SCRIPT_VERSION = "2.0.0"
 $SCRIPT_DATE    = "2026-05-05"
 
-# ── 強制 UTF-8 輸出（避免 Windows PowerShell 5.1 預設 ANSI 代碼頁造成中文亂碼）─
+# Force UTF-8 output (defensive: covers the case where future strings include non-ASCII)
 try {
     if ($PSVersionTable.PSVersion.Major -le 5) {
         chcp 65001 > $null
@@ -26,13 +26,13 @@ try {
     $OutputEncoding           = [System.Text.Encoding]::UTF8
 } catch { }
 
-# ── 系統需求檢查（OS 平台 / Windows 版本）────────────────────
-# 注意：此區塊在函式定義之前，需直接使用 Write-Host
+# System check (OS platform / Windows version)
+# Note: this block runs before function definitions, so use Write-Host directly.
 $platform = [System.Environment]::OSVersion.Platform
 if ($platform -ne 'Win32NT') {
     Write-Host ""
-    Write-Host "XX 此腳本僅支援 Windows 平台（偵測到: $platform）。" -ForegroundColor Red
-    Write-Host "   macOS 使用者請改執行 setup-bigquery-mcp.sh" -ForegroundColor Gray
+    Write-Host "XX This script only supports Windows (detected: $platform)." -ForegroundColor Red
+    Write-Host "   macOS users: please run setup-bigquery-mcp.sh instead." -ForegroundColor Gray
     Write-Host ""
     exit 1
 }
@@ -40,17 +40,17 @@ if ($platform -ne 'Win32NT') {
 $osVersion = [System.Environment]::OSVersion.Version
 if ($osVersion.Major -lt 10) {
     Write-Host ""
-    Write-Host "XX 偵測到 Windows 版本 $($osVersion.ToString())，本腳本需要 Windows 10 或更新版本。" -ForegroundColor Red
-    Write-Host "   建議升級至 Windows 10 (1809 以後) 或 Windows 11。" -ForegroundColor Gray
+    Write-Host "XX Detected Windows $($osVersion.ToString()); this script requires Windows 10 or later." -ForegroundColor Red
+    Write-Host "   Please upgrade to Windows 10 (1809+) or Windows 11." -ForegroundColor Gray
     Write-Host ""
     exit 1
 }
 
-# Windows 11 起 OSVersion.Version.Major 仍為 10，需以 Build 編號區分（22000+ = Win11）
+# Windows 11 still reports OSVersion.Major = 10; tell them apart by build number (22000+ = Win11).
 $winLabel = if ($osVersion.Build -ge 22000) { "Windows 11" } else { "Windows 10" }
-Write-Host "OK 系統檢查通過：$winLabel (Build $($osVersion.Build)), PowerShell $($PSVersionTable.PSVersion)" -ForegroundColor Green
+Write-Host "OK System check passed: $winLabel (Build $($osVersion.Build)), PowerShell $($PSVersionTable.PSVersion)" -ForegroundColor Green
 
-# ── 顏色輸出 ────────────────────────────────────────────────
+# Pretty-printing helpers
 
 function Print-Header([string]$Title) {
     Write-Host ""
@@ -68,7 +68,7 @@ function Print-Info([string]$Msg) { Write-Host "   $Msg" -ForegroundColor Gray }
 
 function Ask([string]$Prompt, [string]$Default = "") {
     if ($Default) {
-        $in = Read-Host "$Prompt [預設: $Default]"
+        $in = Read-Host "$Prompt [default: $Default]"
         if ([string]::IsNullOrWhiteSpace($in)) { return $Default }
         return $in.Trim()
     }
@@ -80,23 +80,23 @@ function Ask-YN([string]$Prompt) {
         $a = Read-Host "$Prompt [y/n]"
         if ($a -match '^[Yy]') { return $true }
         if ($a -match '^[Nn]') { return $false }
-        Print-Warn "請輸入 y 或 n"
+        Print-Warn "Please enter y or n."
     }
 }
 
 function Pause-Wait {
     Write-Host ""
-    Read-Host "按下 Enter 繼續..." | Out-Null
+    Read-Host "Press Enter to continue..." | Out-Null
 }
 
-# ── 更新目前 session 的 PATH（讀取 Machine + User 合併）──────
+# Refresh the current session's PATH (merge Machine + User scopes)
 function Refresh-EnvPath {
     $mp = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     $up = [System.Environment]::GetEnvironmentVariable("Path", "User")
     $env:PATH = "$mp;$up"
 }
 
-# ── 搜尋 gcloud 執行檔 ───────────────────────────────────────
+# Locate the gcloud executable
 function Find-Gcloud {
     # 1. PATH
     $found = Get-Command gcloud -ErrorAction SilentlyContinue
@@ -106,7 +106,7 @@ function Find-Gcloud {
     $found = Get-Command gcloud -ErrorAction SilentlyContinue
     if ($found) { return $found.Source }
 
-    # 2. 常見硬編碼路徑（winget 安裝 / 官方安裝包）
+    # 2. Common install paths (winget / official installer)
     $candidates = @(
         "$env:LOCALAPPDATA\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd",
         "$env:ProgramFiles\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd",
@@ -119,7 +119,7 @@ function Find-Gcloud {
     return $null
 }
 
-# ── 搜尋 uvx 執行檔 ──────────────────────────────────────────
+# Locate the uvx executable
 function Find-Uvx {
     $found = Get-Command uvx -ErrorAction SilentlyContinue
     if ($found) { return $found.Source }
@@ -139,7 +139,7 @@ function Find-Uvx {
     return $null
 }
 
-# ── 搜尋相容 Python（3.10+）────────────────────────────────
+# Locate a compatible Python (3.10+)
 function Find-CompatiblePython {
     foreach ($minor in 13, 12, 11, 10) {
         $cmd = Get-Command "python3.$minor" -ErrorAction SilentlyContinue
@@ -157,51 +157,51 @@ function Find-CompatiblePython {
     return $null
 }
 
-# ── 寫入 JSON（UTF-8 無 BOM，PS 5.1 相容）───────────────────
+# Write JSON file (UTF-8 without BOM, PS 5.1 compatible)
 function Write-JsonFile([string]$Path, [object]$Data) {
     $json    = $Data | ConvertTo-Json -Depth 10
     $utf8nb  = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($Path, $json + "`n", $utf8nb)
 }
 
-# ════════════════════════════════════════════════════════════
-# 開始
-# ════════════════════════════════════════════════════════════
+# ============================================================
+# Start
+# ============================================================
 Clear-Host
 Write-Host ""
 Write-Host "  +--------------------------------------------------+" -ForegroundColor Cyan
-Write-Host "  |   BigQuery MCP Server 互動安裝精靈               |" -ForegroundColor Cyan
-Write-Host "  |   Claude Desktop x Google BigQuery              |" -ForegroundColor Cyan
+Write-Host "  |   BigQuery MCP Server Interactive Installer      |" -ForegroundColor Cyan
+Write-Host "  |   Claude Desktop x Google BigQuery               |" -ForegroundColor Cyan
 Write-Host "  +--------------------------------------------------+" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  版本：v$SCRIPT_VERSION   日期：$SCRIPT_DATE" -ForegroundColor Gray
+Write-Host "  Version: v$SCRIPT_VERSION   Date: $SCRIPT_DATE" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  此腳本將引導你完成 BigQuery MCP Server 的完整設定，"
-Write-Host "  讓 Claude Desktop 能直接查詢你的 BigQuery 資料。"
+Write-Host "  This wizard will guide you through the full BigQuery MCP"
+Write-Host "  setup so Claude Desktop can query your BigQuery data."
 Write-Host ""
-Write-Host "  預計需要 5～10 分鐘，過程中需要網路連線。"
+Write-Host "  Estimated time: 5-10 minutes. An internet connection is required."
 Write-Host ""
 
-if (-not (Ask-YN "準備好開始了嗎？")) {
-    Write-Host "已取消安裝。"
+if (-not (Ask-YN "Ready to begin?")) {
+    Write-Host "Installation cancelled."
     exit 0
 }
 
-# ════════════════════════════════════════════════════════════
-# 步驟一：前置條件檢查
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟一：前置條件檢查"
+# ============================================================
+# Step 1: Prerequisite checks
+# ============================================================
+Print-Header "Step 1: Prerequisite checks"
 
-# 1-1 確認 Windows
-Print-Step "確認作業系統..."
+# 1-1 Confirm Windows
+Print-Step "Checking operating system..."
 if ($env:OS -ne "Windows_NT") {
-    Print-Err "此腳本僅支援 Windows，偵測到目前系統為 $($env:OS)。"
+    Print-Err "This script only supports Windows. Detected: $($env:OS)."
     exit 1
 }
-Print-Ok "Windows 確認通過（$([System.Environment]::OSVersion.VersionString)）"
+Print-Ok "Windows confirmed ($([System.Environment]::OSVersion.VersionString))"
 
-# 1-2 確認 Claude Desktop
-Print-Step "確認 Claude Desktop 是否已安裝..."
+# 1-2 Confirm Claude Desktop
+Print-Step "Checking whether Claude Desktop is installed..."
 $claudeCandidates = @(
     "$env:LOCALAPPDATA\AnthropicClaude\Claude.exe",
     "$env:LOCALAPPDATA\Programs\Claude\Claude.exe",
@@ -214,102 +214,103 @@ foreach ($p in $claudeCandidates) {
 }
 
 if (-not $claudeExe) {
-    Print-Warn "未偵測到 Claude Desktop（已搜尋常見路徑）"
-    Print-Info "請先下載安裝：https://claude.ai/download"
+    Print-Warn "Claude Desktop not found in common install paths."
+    Print-Info "Please download and install: https://claude.ai/download"
     Write-Host ""
-    if (-not (Ask-YN "已確認安裝完成，繼續？")) {
-        Write-Host "請安裝 Claude Desktop 後再執行此腳本。"
+    if (-not (Ask-YN "Have you finished installing? Continue?")) {
+        Write-Host "Please install Claude Desktop and rerun this script."
         exit 1
     }
 } else {
-    Print-Ok "Claude Desktop 已安裝：$claudeExe"
+    Print-Ok "Claude Desktop found: $claudeExe"
 }
 
 # 1-3 Google Cloud SDK
 Write-Host ""
-Print-Step "確認 Google Cloud SDK (gcloud) 是否已安裝..."
+Print-Step "Checking whether Google Cloud SDK (gcloud) is installed..."
 $gcloudCmd = Find-Gcloud
 
 if ($gcloudCmd) {
     $gcloudVer = (& $gcloudCmd --version 2>$null) | Select-Object -First 1
-    Print-Ok "Google Cloud SDK 已安裝：$gcloudCmd"
-    Print-Info "版本：$gcloudVer"
+    Print-Ok "Google Cloud SDK found: $gcloudCmd"
+    Print-Info "Version: $gcloudVer"
 } else {
-    Print-Warn "未偵測到 Google Cloud SDK"
+    Print-Warn "Google Cloud SDK not found."
     Write-Host ""
-    Write-Host "  Google Cloud SDK 提供 gcloud 指令，用於驗證 BigQuery 存取權限。"
+    Write-Host "  The Google Cloud SDK provides the gcloud command, used to"
+    Write-Host "  authenticate to BigQuery."
     Write-Host ""
 
-    if (Ask-YN "是否透過 winget 安裝 Google Cloud SDK？") {
-        Print-Step "執行 winget install Google.CloudSDK..."
+    if (Ask-YN "Install Google Cloud SDK via winget?") {
+        Print-Step "Running: winget install Google.CloudSDK..."
         Write-Host ""
         winget install --id Google.CloudSDK --exact --accept-package-agreements --accept-source-agreements
         $wingetExit = $LASTEXITCODE
 
-        # winget 有時回傳 -1978335212（已安裝）也算成功
+        # winget sometimes returns -1978335212 (already installed); we still treat that as success.
         Refresh-EnvPath
         $gcloudCmd = Find-Gcloud
 
         if ($gcloudCmd) {
-            Print-Ok "Google Cloud SDK 安裝成功：$gcloudCmd"
+            Print-Ok "Google Cloud SDK installed: $gcloudCmd"
         } elseif ($wingetExit -ne 0) {
-            Print-Err "winget 安裝失敗（exit code: $wingetExit）。"
-            Print-Info "請以系統管理員身份重新執行，或手動下載安裝："
+            Print-Err "winget install failed (exit code: $wingetExit)."
+            Print-Info "Try rerunning as Administrator, or install manually:"
             Print-Info "  https://cloud.google.com/sdk/docs/install-sdk#windows"
             exit 1
         } else {
-            Print-Warn "winget 安裝完成，但目前 session 找不到 gcloud。"
-            Print-Info "請關閉並重新開啟 PowerShell 後再執行此腳本。"
+            Print-Warn "winget reports success, but gcloud is not visible in this session."
+            Print-Info "Please close this PowerShell window, open a new one, then rerun this script."
             exit 1
         }
     } else {
-        Print-Warn "略過 Google Cloud SDK 安裝。"
-        if (-not (Ask-YN "確定要在沒有 gcloud 的情況下繼續嗎？")) {
-            Print-Info "請安裝後重新執行：winget install Google.CloudSDK"
+        Print-Warn "Skipping Google Cloud SDK installation."
+        if (-not (Ask-YN "Are you sure you want to continue without gcloud?")) {
+            Print-Info "Install it and rerun: winget install Google.CloudSDK"
             exit 1
         }
     }
 }
 
-# 1-4 CLOUDSDK_PYTHON（選填）
+# 1-4 CLOUDSDK_PYTHON (optional)
 if ($gcloudCmd) {
     Write-Host ""
-    Print-Step "偵測系統上可用的 Python 版本（gcloud 建議 3.10+）..."
+    Print-Step "Detecting available Python versions (gcloud recommends 3.10+)..."
     $compatiblePy = Find-CompatiblePython
     if ($compatiblePy) {
         $pyVer = (& $compatiblePy --version 2>$null)
-        Print-Ok "找到相容 Python：$compatiblePy（$pyVer）"
+        Print-Ok "Compatible Python found: $compatiblePy ($pyVer)"
         $currentEnvPy = [System.Environment]::GetEnvironmentVariable("CLOUDSDK_PYTHON", "User")
         if ($currentEnvPy -ne $compatiblePy) {
             Write-Host ""
-            Write-Host "  設定 CLOUDSDK_PYTHON 可讓 gcloud 使用正確的 Python 版本。"
-            Write-Host "  設定路徑：" -NoNewline; Write-Host $compatiblePy -ForegroundColor Cyan
+            Write-Host "  Setting CLOUDSDK_PYTHON tells gcloud which Python to use."
+            Write-Host "  Path: " -NoNewline; Write-Host $compatiblePy -ForegroundColor Cyan
             Write-Host ""
-            if (Ask-YN "是否將 CLOUDSDK_PYTHON 寫入使用者環境變數？（建議選 y）") {
+            if (Ask-YN "Persist CLOUDSDK_PYTHON to user environment variables? (recommended: y)") {
                 [System.Environment]::SetEnvironmentVariable("CLOUDSDK_PYTHON", $compatiblePy, "User")
                 $env:CLOUDSDK_PYTHON = $compatiblePy
-                Print-Ok "CLOUDSDK_PYTHON 已設定"
+                Print-Ok "CLOUDSDK_PYTHON set."
             }
         } else {
-            Print-Ok "CLOUDSDK_PYTHON 已設定為正確路徑，略過。"
+            Print-Ok "CLOUDSDK_PYTHON already points to the right path; skipping."
         }
     } else {
-        Print-Warn "找不到 Python 3.10+，gcloud 將使用系統預設 Python。"
+        Print-Warn "No Python 3.10+ found. gcloud will fall back to its default Python."
     }
 }
 
 Write-Host ""
-Print-Ok "前置條件檢查完成！"
+Print-Ok "Prerequisite checks complete!"
 Pause-Wait
 
-# ════════════════════════════════════════════════════════════
-# 步驟二：取得 GCP Project ID
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟二：設定 Google Cloud 專案"
+# ============================================================
+# Step 2: GCP Project ID
+# ============================================================
+Print-Header "Step 2: Google Cloud project"
 
-Write-Host "  請輸入你的 GCP Project ID。"
-Write-Host "  可在 Google Cloud Console 右上角或 Dashboard 頁面找到。"
-Write-Host "  格式範例：" -NoNewline; Write-Host "my-project-123456" -ForegroundColor Cyan
+Write-Host "  Enter your GCP Project ID."
+Write-Host "  You can find it in the Google Cloud Console (top right or Dashboard)."
+Write-Host "  Example: " -NoNewline; Write-Host "my-project-123456" -ForegroundColor Cyan
 Write-Host ""
 
 $currentProject = ""
@@ -318,199 +319,200 @@ if ($gcloudCmd) {
     if ($raw -and $raw -ne "(unset)") { $currentProject = $raw.Trim() }
 }
 
-$gcpProjectId = Ask "請輸入 GCP Project ID" $currentProject
+$gcpProjectId = Ask "GCP Project ID" $currentProject
 if ([string]::IsNullOrWhiteSpace($gcpProjectId)) {
-    Print-Err "Project ID 不能為空。"
+    Print-Err "Project ID cannot be empty."
     exit 1
 }
-Print-Ok "Project ID：$gcpProjectId"
+Print-Ok "Project ID: $gcpProjectId"
 
-# ════════════════════════════════════════════════════════════
-# 步驟三：取得 BigQuery Location
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟三：設定 BigQuery 資料集區域"
+# ============================================================
+# Step 3: BigQuery Location
+# ============================================================
+Print-Header "Step 3: BigQuery dataset region"
 
-Write-Host "  請輸入你的 BigQuery dataset 所在區域。"
-Write-Host "  可在 Cloud Console → BigQuery → 點選 dataset → 查看「資料集位置」。"
+Write-Host "  Enter the region your BigQuery dataset lives in."
+Write-Host "  In Cloud Console: BigQuery -> click the dataset -> 'Dataset location'."
 Write-Host ""
-Write-Host "  常見區域："
-Write-Host "    asia-east1      " -ForegroundColor Cyan -NoNewline; Write-Host "台灣（彰化）"
-Write-Host "    asia-east2      " -ForegroundColor Cyan -NoNewline; Write-Host "香港"
-Write-Host "    asia-northeast1 " -ForegroundColor Cyan -NoNewline; Write-Host "日本（東京）"
-Write-Host "    asia-southeast1 " -ForegroundColor Cyan -NoNewline; Write-Host "新加坡"
-Write-Host "    US              " -ForegroundColor Cyan -NoNewline; Write-Host "美國（多區域）"
-Write-Host "    EU              " -ForegroundColor Cyan -NoNewline; Write-Host "歐洲（多區域）"
+Write-Host "  Common regions:"
+Write-Host "    asia-east1      " -ForegroundColor Cyan -NoNewline; Write-Host "Taiwan (Changhua)"
+Write-Host "    asia-east2      " -ForegroundColor Cyan -NoNewline; Write-Host "Hong Kong"
+Write-Host "    asia-northeast1 " -ForegroundColor Cyan -NoNewline; Write-Host "Japan (Tokyo)"
+Write-Host "    asia-southeast1 " -ForegroundColor Cyan -NoNewline; Write-Host "Singapore"
+Write-Host "    US              " -ForegroundColor Cyan -NoNewline; Write-Host "United States (multi-region)"
+Write-Host "    EU              " -ForegroundColor Cyan -NoNewline; Write-Host "Europe (multi-region)"
 Write-Host ""
 
-$bqLocation = Ask "請輸入 BigQuery 資料集區域" "asia-east1"
+$bqLocation = Ask "BigQuery dataset region" "asia-east1"
 if ([string]::IsNullOrWhiteSpace($bqLocation)) {
-    Print-Err "區域不能為空。"
+    Print-Err "Region cannot be empty."
     exit 1
 }
-Print-Ok "BigQuery 區域：$bqLocation"
+Print-Ok "BigQuery region: $bqLocation"
 
 Write-Host ""
-Print-Info "（可選）是否限定只存取特定 dataset？留空表示存取所有 datasets。"
-$bqDataset = Ask "Dataset 名稱（可留空）" ""
+Print-Info "(Optional) Restrict access to a specific dataset? Leave blank to access all datasets."
+$bqDataset = Ask "Dataset name (leave blank for none)" ""
 
 Pause-Wait
 
-# ════════════════════════════════════════════════════════════
-# 步驟四：Google Cloud 認證
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟四：Google Cloud 認證"
+# ============================================================
+# Step 4: Google Cloud authentication
+# ============================================================
+Print-Header "Step 4: Google Cloud authentication"
 
-Write-Host "  接下來需要登入 Google Cloud，取得應用程式預設憑證（ADC）。"
-Write-Host "  系統會開啟瀏覽器，請使用擁有 BigQuery 存取權限的 Google 帳號登入。"
+Write-Host "  Next we'll sign in to Google Cloud and create Application Default"
+Write-Host "  Credentials (ADC). A browser window will open. Use a Google account"
+Write-Host "  that has BigQuery access."
 Write-Host ""
-Print-Warn "若瀏覽器未自動開啟，請複製終端機顯示的網址手動前往。"
+Print-Warn "If the browser does not open automatically, copy the URL printed in the terminal."
 Write-Host ""
 
 if (-not $gcloudCmd) {
-    Print-Warn "找不到 gcloud，略過認證步驟。"
-    Print-Info "請安裝 Google Cloud SDK 後，手動執行以下指令完成認證："
+    Print-Warn "gcloud not available; skipping authentication."
+    Print-Info "After installing the Google Cloud SDK, run these manually:"
     Print-Info "  gcloud auth application-default login"
     Print-Info "  gcloud config set project <YOUR_PROJECT_ID>"
     Print-Info "  gcloud auth application-default set-quota-project <YOUR_PROJECT_ID>"
-} elseif (Ask-YN "是否現在進行 Google Cloud 登入認證？") {
-    Print-Step "執行 gcloud auth application-default login..."
+} elseif (Ask-YN "Sign in to Google Cloud now?") {
+    Print-Step "Running: gcloud auth application-default login..."
     Write-Host ""
-    Print-Info "系統即將開啟瀏覽器，請完成 Google 帳號授權後回到此終端機。"
+    Print-Info "A browser window will open. Approve the consent screen, then return to this terminal."
     Write-Host ""
     & $gcloudCmd auth application-default login
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
-        Print-Ok "Google Cloud 登入完成"
+        Print-Ok "Google Cloud sign-in completed."
     } else {
         Write-Host ""
-        Print-Warn "Google Cloud 登入未完成（可能是取消或網路問題）。"
-        Print-Info "你可以之後手動執行：gcloud auth application-default login"
-        Print-Info "繼續後續設定步驟..."
+        Print-Warn "Sign-in did not complete (cancelled or network issue)."
+        Print-Info "You can run this later: gcloud auth application-default login"
+        Print-Info "Continuing with the rest of the setup..."
     }
 } else {
-    Print-Warn "略過登入步驟。若未登入，MCP Server 將無法存取 BigQuery。"
-    Print-Info "可隨時手動執行：gcloud auth application-default login"
+    Print-Warn "Skipping sign-in. Without it, the MCP server cannot access BigQuery."
+    Print-Info "You can run this any time: gcloud auth application-default login"
 }
 
 if ($gcloudCmd) {
     Write-Host ""
-    Print-Step "設定預設專案：$gcpProjectId"
+    Print-Step "Setting default project: $gcpProjectId"
     & $gcloudCmd config set project $gcpProjectId 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Print-Ok "預設專案已設定"
+        Print-Ok "Default project set."
     } else {
-        Print-Warn "設定預設專案失敗，請手動執行：gcloud config set project $gcpProjectId"
+        Print-Warn "Failed to set default project. Run manually: gcloud config set project $gcpProjectId"
     }
 
-    Print-Step "設定 quota project：$gcpProjectId"
+    Print-Step "Setting quota project: $gcpProjectId"
     & $gcloudCmd auth application-default set-quota-project $gcpProjectId 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Print-Ok "Quota project 已設定"
+        Print-Ok "Quota project set."
     } else {
-        Print-Warn "Quota project 設定失敗（若 ADC 尚未建立，屬正常現象）。"
-        Print-Info "登入後可手動執行：gcloud auth application-default set-quota-project $gcpProjectId"
+        Print-Warn "Failed to set quota project (expected if ADC isn't created yet)."
+        Print-Info "After signing in, run: gcloud auth application-default set-quota-project $gcpProjectId"
     }
 }
 
-Print-Ok "Google Cloud 認證設定完成"
+Print-Ok "Google Cloud authentication step complete."
 Pause-Wait
 
-# ════════════════════════════════════════════════════════════
-# 步驟五：安裝 uv
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟五：安裝 uv（Python 套件管理工具）"
+# ============================================================
+# Step 5: Install uv
+# ============================================================
+Print-Header "Step 5: Install uv (Python package manager)"
 
 $uvxPath = Find-Uvx
 
 if ($uvxPath) {
-    Print-Ok "uv / uvx 已安裝：$uvxPath"
+    Print-Ok "uv / uvx already installed: $uvxPath"
 } else {
-    Print-Step "未偵測到 uvx，即將安裝 uv..."
+    Print-Step "uvx not found; installing uv..."
     Write-Host ""
-    if (Ask-YN "是否現在安裝 uv？（需要網路連線）") {
-        Print-Step "執行 uv Windows 安裝腳本..."
+    if (Ask-YN "Install uv now? (requires internet)") {
+        Print-Step "Running the uv Windows install script..."
         Write-Host ""
         Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
 
-        # 更新 PATH
+        # Refresh PATH
         $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
         Refresh-EnvPath
 
         $uvxPath = Find-Uvx
         if (-not $uvxPath) {
-            # fallback：尚未在 PATH 但檔案存在
+            # Fallback: not yet on PATH but the file exists
             $fallback = "$env:USERPROFILE\.local\bin\uvx.exe"
             if (Test-Path $fallback) {
                 $uvxPath = $fallback
-                Print-Ok "uv 安裝完成，uvx 路徑：$uvxPath"
+                Print-Ok "uv installed. uvx path: $uvxPath"
             } else {
-                Print-Err "無法確認 uvx 路徑，請手動確認後修改設定檔。"
-                Print-Info "常見安裝路徑：$env:USERPROFILE\.local\bin\uvx.exe"
+                Print-Err "Could not determine uvx path; please verify and edit the config file later."
+                Print-Info "Common install path: $env:USERPROFILE\.local\bin\uvx.exe"
                 $uvxPath = "$env:USERPROFILE\.local\bin\uvx.exe"
             }
         } else {
-            Print-Ok "uv 安裝完成，uvx 路徑：$uvxPath"
+            Print-Ok "uv installed. uvx path: $uvxPath"
         }
     } else {
-        Print-Err "需要 uv 才能執行 mcp-server-bigquery。請手動安裝後重新執行。"
-        Print-Info '安裝指令（PowerShell）：powershell -c "irm https://astral.sh/uv/install.ps1 | iex"'
+        Print-Err "uv is required to run mcp-server-bigquery. Please install it manually and rerun."
+        Print-Info 'Install command (PowerShell): powershell -c "irm https://astral.sh/uv/install.ps1 | iex"'
         exit 1
     }
 }
 
-Print-Ok "uvx 路徑：$uvxPath"
+Print-Ok "uvx path: $uvxPath"
 
-# ── 步驟五補充：確認 Python 3.13 ────────────────────────────
+# Step 5 (cont.): ensure Python 3.13 is available
 Write-Host ""
-Print-Step "確認 uvx 可用的 Python 版本（需要 3.10+）..."
+Print-Step "Checking Python versions available to uvx (3.10+ required)..."
 
-# 更新 uv
-Print-Step "更新 uv 至最新版本..."
+# Update uv
+Print-Step "Updating uv to the latest version..."
 uv self update 2>$null
 if ($LASTEXITCODE -eq 0) {
-    Print-Ok "uv 已是最新版本"
+    Print-Ok "uv is up to date."
 } else {
-    Print-Warn "uv self update 失敗（可能已是最新），繼續進行。"
+    Print-Warn "uv self update failed (likely already up to date); continuing."
 }
 
 Write-Host ""
-Print-Step "透過 uv 安裝 Python 3.13（uvx 執行 mcp-server-bigquery 所需）..."
+Print-Step "Installing Python 3.13 via uv (required by uvx to run mcp-server-bigquery)..."
 Write-Host ""
 
 $uvPythonPath = ""
-if (Ask-YN "是否透過 uv 安裝 Python 3.13？（約 30MB，建議選 y）") {
+if (Ask-YN "Install Python 3.13 via uv? (~30MB; recommended: y)") {
     uv python install 3.13
     if ($LASTEXITCODE -eq 0) {
         $uvPythonPath = (uv python find 3.13 2>$null | Select-Object -First 1)
         if ($uvPythonPath -and (Test-Path $uvPythonPath)) {
             $pyVer = (& $uvPythonPath --version 2>$null)
-            Print-Ok "uv Python 3.13 已就緒：$uvPythonPath（$pyVer）"
+            Print-Ok "uv Python 3.13 ready: $uvPythonPath ($pyVer)"
         } else {
-            Print-Ok "uv Python 3.13 已安裝，使用版本號識別。"
+            Print-Ok "uv Python 3.13 installed (referencing it by version)."
             $uvPythonPath = "3.13"
         }
     } else {
-        Print-Warn "uv python install 3.13 失敗，Claude Desktop 可能出現 Python 路徑錯誤。"
-        Print-Info "請之後手動執行：uv python install 3.13"
+        Print-Warn "uv python install 3.13 failed; Claude Desktop may report a Python path error."
+        Print-Info "Run manually later: uv python install 3.13"
     }
 } else {
-    Print-Warn "略過。若 Claude Desktop 出現 Python 路徑錯誤，請執行：uv python install 3.13"
+    Print-Warn "Skipping. If Claude Desktop reports a Python path error, run: uv python install 3.13"
 }
 
 Pause-Wait
 
-# ════════════════════════════════════════════════════════════
-# 步驟六：寫入 Claude Desktop 設定檔
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟六：設定 Claude Desktop"
+# ============================================================
+# Step 6: Write Claude Desktop config
+# ============================================================
+Print-Header "Step 6: Configure Claude Desktop"
 
 $claudeConfigDir = "$env:APPDATA\Claude"
 $configFile      = "$claudeConfigDir\claude_desktop_config.json"
-Print-Step "目標設定檔：$configFile"
+Print-Step "Target config file: $configFile"
 
 New-Item -ItemType Directory -Force -Path $claudeConfigDir | Out-Null
 
-# 組建 args 陣列
+# Build the args array
 $mcpArgs = [System.Collections.Generic.List[string]]@(
     "mcp-server-bigquery", "--project", $gcpProjectId, "--location", $bqLocation
 )
@@ -525,15 +527,15 @@ $bqEntry = [PSCustomObject]@{
 }
 
 if (Test-Path $configFile) {
-    Print-Warn "偵測到現有設定檔，內容如下："
+    Print-Warn "Existing config file detected. Current contents:"
     Write-Host ""
     Get-Content $configFile | ForEach-Object { Write-Host "  $_" }
     Write-Host ""
 
-    if (Ask-YN "是否要在現有設定中新增/更新 bigquery 設定？（建議選 y）") {
+    if (Ask-YN "Add/update the bigquery entry inside this config? (recommended: y)") {
         $backupFile = "$configFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
         Copy-Item $configFile $backupFile
-        Print-Ok "已備份原始設定至：$backupFile"
+        Print-Ok "Original config backed up to: $backupFile"
 
         $rawJson = Get-Content $configFile -Raw -ErrorAction SilentlyContinue
         if ([string]::IsNullOrWhiteSpace($rawJson)) {
@@ -542,7 +544,7 @@ if (Test-Path $configFile) {
             try {
                 $config = $rawJson | ConvertFrom-Json
             } catch {
-                Print-Warn "設定檔 JSON 解析失敗，將建立全新設定。"
+                Print-Warn "Failed to parse the existing config as JSON; creating a fresh one."
                 $config = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
             }
         }
@@ -558,103 +560,103 @@ if (Test-Path $configFile) {
         }
 
         Write-JsonFile $configFile $config
-        Print-Ok "設定已更新"
+        Print-Ok "Config updated."
     } else {
-        Print-Warn "略過設定檔更新。請手動編輯：$configFile"
+        Print-Warn "Skipping config update. Edit it manually if needed: $configFile"
     }
 } else {
-    Print-Step "建立新的設定檔..."
+    Print-Step "Creating a new config file..."
     $newConfig = [PSCustomObject]@{
         mcpServers = [PSCustomObject]@{
             bigquery = $bqEntry
         }
     }
     Write-JsonFile $configFile $newConfig
-    Print-Ok "設定檔已建立"
+    Print-Ok "Config file created."
 }
 
 Write-Host ""
-Print-Step "最終設定檔內容："
+Print-Step "Final config contents:"
 Write-Host ""
 Get-Content $configFile | ForEach-Object { Write-Host "  $_" }
 Write-Host ""
 
 Pause-Wait
 
-# ════════════════════════════════════════════════════════════
-# 步驟七：驗證設定
-# ════════════════════════════════════════════════════════════
-Print-Header "步驟七：驗證設定"
+# ============================================================
+# Step 7: Verify
+# ============================================================
+Print-Header "Step 7: Verify the setup"
 
-Print-Step "驗證 uvx 路徑..."
+Print-Step "Verifying uvx path..."
 if ((Test-Path $uvxPath -ErrorAction SilentlyContinue) -or (Get-Command uvx -ErrorAction SilentlyContinue)) {
-    Print-Ok "uvx 可執行"
+    Print-Ok "uvx is executable."
 } else {
-    Print-Warn "無法驗證 uvx 路徑：$uvxPath"
-    Print-Info "請確認 uv 已正確安裝，或手動修改設定檔中的 command 路徑。"
+    Print-Warn "Could not verify uvx path: $uvxPath"
+    Print-Info "Make sure uv is installed correctly, or update the 'command' field in the config."
 }
 
-Print-Step "驗證 Google Cloud 認證..."
+Print-Step "Verifying Google Cloud authentication..."
 if ($gcloudCmd) {
     $token = (& $gcloudCmd auth application-default print-access-token 2>$null)
     if ($LASTEXITCODE -eq 0 -and $token) {
-        Print-Ok "Google Cloud ADC 認證有效"
+        Print-Ok "Google Cloud ADC credentials are valid."
     } else {
-        Print-Warn "無法驗證 Google Cloud 認證，請確認已完成步驟四的登入流程。"
+        Print-Warn "Could not verify Google Cloud credentials. Make sure Step 4 sign-in completed."
     }
 }
 
-Print-Step "驗證設定檔格式..."
+Print-Step "Validating config file format..."
 try {
     Get-Content $configFile -Raw | ConvertFrom-Json | Out-Null
-    Print-Ok "設定檔 JSON 格式正確"
+    Print-Ok "Config file is valid JSON."
 } catch {
-    Print-Err "設定檔 JSON 格式有誤，請手動檢查：$configFile"
+    Print-Err "Config file JSON is invalid; please inspect manually: $configFile"
 }
 
-# ════════════════════════════════════════════════════════════
-# 完成
-# ════════════════════════════════════════════════════════════
-Print-Header "安裝完成！"
+# ============================================================
+# Done
+# ============================================================
+Print-Header "Installation complete!"
 
-Write-Host "  接下來的步驟：" -ForegroundColor White
+Write-Host "  Next steps:" -ForegroundColor White
 Write-Host ""
 Write-Host "  1. " -ForegroundColor Cyan -NoNewline
-Write-Host "完全關閉 Claude Desktop（從系統匣右鍵選 Quit）"
+Write-Host "Fully quit Claude Desktop (right-click the tray icon -> Quit)."
 Write-Host "  2. " -ForegroundColor Cyan -NoNewline
-Write-Host "重新啟動 Claude Desktop"
+Write-Host "Relaunch Claude Desktop."
 Write-Host "  3. " -ForegroundColor Cyan -NoNewline
-Write-Host "前往 Settings -> Developer"
-Write-Host "     確認 bigquery 狀態顯示為 running（藍色）"
+Write-Host "Go to Settings -> Developer."
+Write-Host "     Confirm bigquery shows status 'running' (blue)."
 Write-Host ""
-Write-Host "  驗證連線（在 Claude 新對話中輸入）：" -ForegroundColor White
+Write-Host "  Test the connection (in a new Claude conversation):" -ForegroundColor White
 Write-Host ""
-Write-Host "  「請列出 $gcpProjectId 專案中所有的 BigQuery datasets」" -ForegroundColor Cyan
+Write-Host "  'List all BigQuery datasets in the $gcpProjectId project.'" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  ──────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host "  設定摘要：" -ForegroundColor White
+Write-Host "  ----------------------------------------------" -ForegroundColor DarkGray
+Write-Host "  Configuration summary:" -ForegroundColor White
 Write-Host "    Project ID   : " -NoNewline; Write-Host $gcpProjectId -ForegroundColor Cyan
 Write-Host "    Location     : " -NoNewline; Write-Host $bqLocation -ForegroundColor Cyan
 if (-not [string]::IsNullOrWhiteSpace($bqDataset)) {
     Write-Host "    Dataset      : " -NoNewline; Write-Host $bqDataset -ForegroundColor Cyan
 }
-Write-Host "    uvx 路徑     : " -NoNewline; Write-Host $uvxPath -ForegroundColor Cyan
-Write-Host "    設定檔位置   : " -NoNewline; Write-Host $configFile -ForegroundColor Cyan
-Write-Host "  ──────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "    uvx path     : " -NoNewline; Write-Host $uvxPath -ForegroundColor Cyan
+Write-Host "    Config file  : " -NoNewline; Write-Host $configFile -ForegroundColor Cyan
+Write-Host "  ----------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 
-if (Ask-YN "是否現在重啟 Claude Desktop？") {
-    Print-Step "關閉 Claude Desktop..."
+if (Ask-YN "Restart Claude Desktop now?") {
+    Print-Step "Stopping Claude Desktop..."
     $procs = Get-Process -Name "Claude","claude" -ErrorAction SilentlyContinue
     if ($procs) {
         $procs | Stop-Process -Force
         Start-Sleep -Seconds 2
-        Print-Ok "Claude Desktop 已關閉"
+        Print-Ok "Claude Desktop stopped."
     } else {
-        Print-Info "Claude Desktop 未在執行中"
+        Print-Info "Claude Desktop is not running."
     }
 
-    Print-Step "啟動 Claude Desktop..."
+    Print-Step "Launching Claude Desktop..."
     $launched = $false
     if ($claudeExe -and (Test-Path $claudeExe)) {
         Start-Process $claudeExe
@@ -668,12 +670,12 @@ if (Ask-YN "是否現在重啟 Claude Desktop？") {
     }
 
     if ($launched) {
-        Print-Ok "Claude Desktop 已重新啟動"
+        Print-Ok "Claude Desktop relaunched."
     } else {
-        Print-Warn "無法自動啟動，請手動開啟 Claude Desktop。"
+        Print-Warn "Could not launch automatically; please open Claude Desktop manually."
     }
 }
 
 Write-Host ""
-Write-Host "  設定完成！祝使用愉快！" -ForegroundColor Green
+Write-Host "  Setup complete. Enjoy!" -ForegroundColor Green
 Write-Host ""
