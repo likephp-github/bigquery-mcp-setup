@@ -17,16 +17,14 @@ Claude 會透過 MCP Server 即時查詢你的 BigQuery 資料並回覆。
 
 | 項目 | 說明 |
 |------|------|
-| 作業系統 | macOS（Intel 或 Apple Silicon） |
+| 作業系統 | macOS（Intel 或 Apple Silicon） / Windows 10、11（PowerShell 5.1+） |
 | Claude Desktop | [下載頁面](https://claude.ai/download) |
 | Google Cloud 帳號 | 需有目標專案的 BigQuery 存取權限 |
 | 網路連線 | 安裝過程需要下載套件 |
 
-> **注意：此腳本目前僅支援 macOS。**
-
 ---
 
-## 快速開始
+## 快速開始（macOS）
 
 ### 方式一：一行指令直接安裝（最快）
 
@@ -50,6 +48,40 @@ cd bigquery-mcp-setup
 chmod +x setup-bigquery-mcp.sh
 ./setup-bigquery-mcp.sh
 ```
+
+---
+
+## 快速開始（Windows）
+
+> 請使用 **PowerShell 5.1 或以上**（建議以一般使用者身分開啟）執行。
+
+### 方式一：一行指令直接安裝（最快）
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/likephp-github/bigquery-mcp-setup/main/setup-bigquery-mcp.ps1 | iex"
+```
+
+### 方式二：下載後執行
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/likephp-github/bigquery-mcp-setup/main/setup-bigquery-mcp.ps1 -OutFile setup-bigquery-mcp.ps1
+powershell -ExecutionPolicy Bypass -File .\setup-bigquery-mcp.ps1
+```
+
+### 方式三：git clone 後執行
+
+```powershell
+git clone https://github.com/likephp-github/bigquery-mcp-setup.git
+cd bigquery-mcp-setup
+powershell -ExecutionPolicy Bypass -File .\setup-bigquery-mcp.ps1
+```
+
+> 若遇到「無法載入指令碼，因為這個系統上已停用指令碼執行」訊息，可改在目前 session 暫時放寬執行原則：
+>
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+> .\setup-bigquery-mcp.ps1
+> ```
 
 ---
 
@@ -87,7 +119,14 @@ chmod +x setup-bigquery-mcp.sh
 
 ## 設定摘要（安裝完成後）
 
-腳本會在 `~/Library/Application Support/Claude/claude_desktop_config.json` 寫入以下設定：
+腳本會在 Claude Desktop 設定檔中寫入 BigQuery MCP 設定。設定檔位置：
+
+| 平台 | 路徑 |
+|------|------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+寫入內容（macOS 範例）：
 
 ```json
 {
@@ -103,6 +142,8 @@ chmod +x setup-bigquery-mcp.sh
   }
 }
 ```
+
+Windows 上 `command` 會指向 `C:\Users\你的使用者名稱\.local\bin\uvx.exe`（或 `%APPDATA%\uv\bin\uvx.exe`），其餘欄位相同。
 
 ---
 
@@ -181,8 +222,16 @@ eval "$(/usr/local/bin/brew shellenv)"
 
 若需要移除 BigQuery MCP 設定，直接編輯設定檔：
 
+**macOS：**
+
 ```bash
 open ~/Library/Application\ Support/Claude/claude_desktop_config.json
+```
+
+**Windows（PowerShell）：**
+
+```powershell
+notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 ```
 
 刪除 `mcpServers.bigquery` 區塊後儲存，重啟 Claude Desktop 即可。
