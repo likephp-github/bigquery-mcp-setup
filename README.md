@@ -246,6 +246,8 @@ notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| v1.11.0 | 2026-05-05 | Windows 腳本啟動時新增 OS 平台與 Windows 版本檢查（需 Windows 10 以上） |
+| v1.10.0 | 2026-05-05 | 修正 Windows PowerShell 5.1 中文亂碼：腳本加上 UTF-8 BOM 並強制設定主控台輸出編碼為 UTF-8 |
 | v1.9.0 | 2026-05-05 | 新增 Windows 10/11 互動式安裝腳本（PowerShell）與 README 雙平台說明 |
 | v1.8.0 | 2026-03-21 | 新增 realpath 缺失偵測與自動建立替代腳本 |
 | v1.7.0 | 2026-03-21 | 移除 env.UV_PYTHON 設定；改用 uv python install 解決 Python 問題 |

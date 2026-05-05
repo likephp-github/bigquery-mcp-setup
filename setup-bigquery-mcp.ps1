@@ -1,10 +1,10 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     BigQuery MCP Server 互動安裝腳本 for Windows
 .DESCRIPTION
     引導使用者完成 Claude Desktop + BigQuery MCP 設定
-    版本：1.0.0  日期：2026-05-05
+    版本：1.2.0  日期：2026-05-05
 
 .NOTES
     執行方式（二選一）：
@@ -14,8 +14,41 @@
       .\setup-bigquery-mcp.ps1
 #>
 
-$SCRIPT_VERSION = "1.0.0"
+$SCRIPT_VERSION = "1.2.0"
 $SCRIPT_DATE    = "2026-05-05"
+
+# ── 強制 UTF-8 輸出（避免 Windows PowerShell 5.1 預設 ANSI 代碼頁造成中文亂碼）─
+try {
+    if ($PSVersionTable.PSVersion.Major -le 5) {
+        chcp 65001 > $null
+    }
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding           = [System.Text.Encoding]::UTF8
+} catch { }
+
+# ── 系統需求檢查（OS 平台 / Windows 版本）────────────────────
+# 注意：此區塊在函式定義之前，需直接使用 Write-Host
+$platform = [System.Environment]::OSVersion.Platform
+if ($platform -ne 'Win32NT') {
+    Write-Host ""
+    Write-Host "XX 此腳本僅支援 Windows 平台（偵測到: $platform）。" -ForegroundColor Red
+    Write-Host "   macOS 使用者請改執行 setup-bigquery-mcp.sh" -ForegroundColor Gray
+    Write-Host ""
+    exit 1
+}
+
+$osVersion = [System.Environment]::OSVersion.Version
+if ($osVersion.Major -lt 10) {
+    Write-Host ""
+    Write-Host "XX 偵測到 Windows 版本 $($osVersion.ToString())，本腳本需要 Windows 10 或更新版本。" -ForegroundColor Red
+    Write-Host "   建議升級至 Windows 10 (1809 以後) 或 Windows 11。" -ForegroundColor Gray
+    Write-Host ""
+    exit 1
+}
+
+# Windows 11 起 OSVersion.Version.Major 仍為 10，需以 Build 編號區分（22000+ = Win11）
+$winLabel = if ($osVersion.Build -ge 22000) { "Windows 11" } else { "Windows 10" }
+Write-Host "OK 系統檢查通過：$winLabel (Build $($osVersion.Build)), PowerShell $($PSVersionTable.PSVersion)" -ForegroundColor Green
 
 # ── 顏色輸出 ────────────────────────────────────────────────
 
