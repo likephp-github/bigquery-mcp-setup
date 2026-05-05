@@ -4,7 +4,7 @@
     BigQuery MCP Server interactive installer for Windows
 .DESCRIPTION
     Guides the user through Claude Desktop + BigQuery MCP setup.
-    Version: 2.0.0  Date: 2026-05-05
+    Version: 2.1.0  Date: 2026-05-05
 
 .NOTES
     How to run (pick one):
@@ -14,7 +14,7 @@
       .\setup-bigquery-mcp.ps1
 #>
 
-$SCRIPT_VERSION = "2.0.0"
+$SCRIPT_VERSION = "2.1.0"
 $SCRIPT_DATE    = "2026-05-05"
 
 # Force UTF-8 output (defensive: covers the case where future strings include non-ASCII)
@@ -241,32 +241,69 @@ if ($gcloudCmd) {
     Write-Host "  authenticate to BigQuery."
     Write-Host ""
 
-    if (Ask-YN "Install Google Cloud SDK via winget?") {
-        Print-Step "Running: winget install Google.CloudSDK..."
+    # winget is not bundled with Windows Server editions; detect first instead of assuming.
+    $wingetAvail = $null -ne (Get-Command winget -ErrorAction SilentlyContinue)
+    if (-not $wingetAvail) {
+        Print-Info "winget is not available on this system (common on Windows Server)."
+        Print-Info "Will fall back to downloading the official installer directly."
         Write-Host ""
-        winget install --id Google.CloudSDK --exact --accept-package-agreements --accept-source-agreements
-        $wingetExit = $LASTEXITCODE
+    }
 
-        # winget sometimes returns -1978335212 (already installed); we still treat that as success.
+    if (Ask-YN "Install Google Cloud SDK now?") {
+        $installExit = 0
+        $installerLaunched = $false
+
+        if ($wingetAvail) {
+            Print-Step "Running: winget install Google.CloudSDK..."
+            Write-Host ""
+            winget install --id Google.CloudSDK --exact --accept-package-agreements --accept-source-agreements
+            $installExit = $LASTEXITCODE
+            # winget sometimes returns -1978335212 (already installed); treat that as success.
+        } else {
+            $installerUrl  = "https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe"
+            $installerPath = Join-Path $env:TEMP "GoogleCloudSDKInstaller.exe"
+            Print-Step "Downloading installer: $installerUrl"
+            try {
+                Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+                Print-Ok "Downloaded to $installerPath"
+            } catch {
+                Print-Err "Download failed: $($_.Exception.Message)"
+                Print-Info "Please install manually: https://cloud.google.com/sdk/docs/install-sdk#windows"
+                exit 1
+            }
+            Print-Step "Launching installer. Please complete the wizard (keep 'Add gcloud to PATH' checked)."
+            try {
+                Start-Process -FilePath $installerPath -Wait
+                $installerLaunched = $true
+            } catch {
+                Print-Err "Failed to launch installer: $($_.Exception.Message)"
+                exit 1
+            }
+        }
+
         Refresh-EnvPath
         $gcloudCmd = Find-Gcloud
 
         if ($gcloudCmd) {
             Print-Ok "Google Cloud SDK installed: $gcloudCmd"
-        } elseif ($wingetExit -ne 0) {
-            Print-Err "winget install failed (exit code: $wingetExit)."
+        } elseif ($wingetAvail -and $installExit -ne 0) {
+            Print-Err "winget install failed (exit code: $installExit)."
             Print-Info "Try rerunning as Administrator, or install manually:"
             Print-Info "  https://cloud.google.com/sdk/docs/install-sdk#windows"
             exit 1
         } else {
-            Print-Warn "winget reports success, but gcloud is not visible in this session."
+            Print-Warn "Install completed but gcloud is not visible in this session."
             Print-Info "Please close this PowerShell window, open a new one, then rerun this script."
             exit 1
         }
     } else {
         Print-Warn "Skipping Google Cloud SDK installation."
         if (-not (Ask-YN "Are you sure you want to continue without gcloud?")) {
-            Print-Info "Install it and rerun: winget install Google.CloudSDK"
+            if ($wingetAvail) {
+                Print-Info "Install it and rerun: winget install Google.CloudSDK"
+            } else {
+                Print-Info "Install it from: https://cloud.google.com/sdk/docs/install-sdk#windows"
+            }
             exit 1
         }
     }
@@ -580,6 +617,24 @@ Print-Step "Final config contents:"
 Write-Host ""
 Get-Content $configFile | ForEach-Object { Write-Host "  $_" }
 Write-Host ""
+
+# Workaround for upstream mcp-server-bigquery: server.py hardcodes
+# logging.FileHandler('/tmp/mcp_bigquery_server.log'). On Windows that resolves
+# to C:\tmp\... which doesn't exist by default, causing the server to crash on
+# startup. We pre-create the directory so the upstream package works as-is.
+$tmpDir = "C:\tmp"
+if (-not (Test-Path $tmpDir)) {
+    Print-Step "Creating $tmpDir (workaround for upstream mcp-server-bigquery hardcoded /tmp path)..."
+    try {
+        New-Item -ItemType Directory -Force -Path $tmpDir -ErrorAction Stop | Out-Null
+        Print-Ok "Created $tmpDir"
+    } catch {
+        Print-Warn "Failed to create $tmpDir: $($_.Exception.Message)"
+        Print-Info "If Claude Desktop reports a log-file error later, run as admin: mkdir C:\tmp"
+    }
+} else {
+    Print-Info "Log directory $tmpDir already exists; skipping."
+}
 
 Pause-Wait
 

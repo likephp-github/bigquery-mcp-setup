@@ -55,7 +55,10 @@ chmod +x setup-bigquery-mcp.sh
 
 ## 快速開始（Windows）
 
-> 請使用 **PowerShell 5.1 或以上**（建議以一般使用者身分開啟）執行。
+> **請在 PowerShell 中執行**（Windows Terminal 或 `powershell.exe`），**不是 `cmd.exe`**。
+> 需 PowerShell 5.1 或以上，建議以一般使用者身分開啟。
+>
+> **Windows Server 使用者注意**：Server 版預設沒有 `winget`，腳本會自動偵測並改為直接下載 Cloud SDK 安裝程式。
 
 ### 方式一：一行指令直接安裝（最快）
 
@@ -246,6 +249,7 @@ notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| v1.13.0 | 2026-05-05 | 修正 #1 回報問題：偵測 winget 是否存在（Windows Server 沒有），無 winget 時自動下載 Cloud SDK 安裝程式；安裝完成時建立 `C:\tmp` 以解決上游 mcp-server-bigquery 硬編碼路徑；README 標註 Windows 需用 PowerShell 而非 cmd.exe |
 | v1.12.0 | 2026-05-05 | Windows 腳本所有訊息改為英文，避免 Windows PowerShell 主控台中文亂碼（內部腳本版本升至 2.0.0） |
 | v1.11.0 | 2026-05-05 | Windows 腳本啟動時新增 OS 平台與 Windows 版本檢查（需 Windows 10 以上） |
 | v1.10.0 | 2026-05-05 | 修正 Windows PowerShell 5.1 中文亂碼：腳本加上 UTF-8 BOM 並強制設定主控台輸出編碼為 UTF-8 |

@@ -55,7 +55,10 @@ chmod +x setup-bigquery-mcp.sh
 
 ## Quick Start (Windows)
 
-> Use **PowerShell 5.1 or later** (running as a regular user is recommended).
+> **Run these in PowerShell** (Windows Terminal or `powershell.exe`), **not in `cmd.exe`**.
+> PowerShell 5.1 or later is required; running as a regular user is recommended.
+>
+> **Windows Server users**: `winget` ships only with the desktop App Installer and is missing on Server SKUs — the script auto-detects this and falls back to downloading the official Cloud SDK installer directly.
 
 ### Option 1: One-line install (fastest)
 
@@ -246,6 +249,7 @@ The backup file lives in the same directory, named `claude_desktop_config.json.b
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.13.0 | 2026-05-05 | Fixes from issue #1: detect whether `winget` is present (missing on Windows Server) and fall back to downloading the Cloud SDK installer directly; create `C:\tmp` after install to work around the upstream `mcp-server-bigquery` hardcoded `/tmp` log path; README clarifies that Windows commands must run in PowerShell, not `cmd.exe` |
 | v1.12.0 | 2026-05-05 | Windows script messages translated to English to sidestep Windows PowerShell console mojibake (internal script version bumped to 2.0.0) |
 | v1.11.0 | 2026-05-05 | Windows script now performs OS platform and Windows version checks at startup (requires Windows 10+) |
 | v1.10.0 | 2026-05-05 | Fixed mojibake on Windows PowerShell 5.1: added UTF-8 BOM and forced console output encoding to UTF-8 |
