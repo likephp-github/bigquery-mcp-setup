@@ -1,3 +1,5 @@
+[English](./README.en.md) | **繁體中文**
+
 # BigQuery MCP Server 自動安裝腳本
 
 讓 **Claude Desktop** 直接查詢你的 **Google BigQuery** 資料，一鍵完成所有設定。
@@ -244,6 +246,7 @@ notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| v1.9.0 | 2026-05-05 | 新增 Windows 10/11 互動式安裝腳本（PowerShell）與 README 雙平台說明 |
 | v1.8.0 | 2026-03-21 | 新增 realpath 缺失偵測與自動建立替代腳本 |
 | v1.7.0 | 2026-03-21 | 移除 env.UV_PYTHON 設定；改用 uv python install 解決 Python 問題 |
 | v1.6.0 | 2026-03-21 | 修正全形字元緊接變數名稱導致 set -u 誤判 |
