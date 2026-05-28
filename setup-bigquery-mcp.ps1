@@ -626,7 +626,7 @@ if (-not (Test-Path $tmpDir)) {
         New-Item -ItemType Directory -Force -Path $tmpDir -ErrorAction Stop | Out-Null
         Print-Ok "Created $tmpDir"
     } catch {
-        Print-Warn "Failed to create $tmpDir: $($_.Exception.Message)"
+        Print-Warn "Failed to create ${tmpDir}: $($_.Exception.Message)"
         Print-Info "If Claude Desktop reports a log-file error later, run as admin: mkdir C:\tmp"
     }
 } else {
