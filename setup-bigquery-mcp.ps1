@@ -192,15 +192,8 @@ if (-not (Ask-YN "Ready to begin?")) {
 # ============================================================
 Print-Header "Step 1: Prerequisite checks"
 
-# 1-1 Confirm Windows
-Print-Step "Checking operating system..."
-if ($env:OS -ne "Windows_NT") {
-    Print-Err "This script only supports Windows. Detected: $($env:OS)."
-    exit 1
-}
-Print-Ok "Windows confirmed ($([System.Environment]::OSVersion.VersionString))"
-
-# 1-2 Confirm Claude Desktop
+# 1-1 Confirm Claude Desktop
+# (OS platform / Windows version were already validated at the top of the script.)
 Print-Step "Checking whether Claude Desktop is installed..."
 $claudeCandidates = @(
     "$env:LOCALAPPDATA\AnthropicClaude\Claude.exe",
@@ -225,7 +218,7 @@ if (-not $claudeExe) {
     Print-Ok "Claude Desktop found: $claudeExe"
 }
 
-# 1-3 Google Cloud SDK
+# 1-2 Google Cloud SDK
 Write-Host ""
 Print-Step "Checking whether Google Cloud SDK (gcloud) is installed..."
 $gcloudCmd = Find-Gcloud
@@ -251,7 +244,6 @@ if ($gcloudCmd) {
 
     if (Ask-YN "Install Google Cloud SDK now?") {
         $installExit = 0
-        $installerLaunched = $false
 
         if ($wingetAvail) {
             Print-Step "Running: winget install Google.CloudSDK..."
@@ -263,6 +255,11 @@ if ($gcloudCmd) {
             $installerUrl  = "https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe"
             $installerPath = Join-Path $env:TEMP "GoogleCloudSDKInstaller.exe"
             Print-Step "Downloading installer: $installerUrl"
+            # Older Windows Server / PS 5.1 may default to TLS 1.0, which dl.google.com rejects.
+            # Force TLS 1.2 so the download succeeds. SilentlyContinue also avoids the PS 5.1
+            # progress bar that slows Invoke-WebRequest down by orders of magnitude.
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+            $ProgressPreference = 'SilentlyContinue'
             try {
                 Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
                 Print-Ok "Downloaded to $installerPath"
@@ -274,11 +271,11 @@ if ($gcloudCmd) {
             Print-Step "Launching installer. Please complete the wizard (keep 'Add gcloud to PATH' checked)."
             try {
                 Start-Process -FilePath $installerPath -Wait
-                $installerLaunched = $true
             } catch {
                 Print-Err "Failed to launch installer: $($_.Exception.Message)"
                 exit 1
             }
+            Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
         }
 
         Refresh-EnvPath
@@ -309,7 +306,7 @@ if ($gcloudCmd) {
     }
 }
 
-# 1-4 CLOUDSDK_PYTHON (optional)
+# 1-3 CLOUDSDK_PYTHON (optional)
 if ($gcloudCmd) {
     Write-Host ""
     Print-Step "Detecting available Python versions (gcloud recommends 3.10+)..."
