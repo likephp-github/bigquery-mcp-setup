@@ -4,7 +4,7 @@
     BigQuery MCP Server interactive installer for Windows
 .DESCRIPTION
     Guides the user through Claude Desktop + BigQuery MCP setup.
-    Version: 2.1.0  Date: 2026-05-05
+    Version: 2.2.0  Date: 2026-08-04
 
 .NOTES
     How to run (pick one):
@@ -14,8 +14,8 @@
       .\setup-bigquery-mcp.ps1
 #>
 
-$SCRIPT_VERSION = "2.1.0"
-$SCRIPT_DATE    = "2026-05-05"
+$SCRIPT_VERSION = "2.2.0"
+$SCRIPT_DATE    = "2026-08-04"
 
 # Force UTF-8 output (defensive: covers the case where future strings include non-ASCII)
 try {
@@ -547,8 +547,13 @@ Print-Step "Target config file: $configFile"
 New-Item -ItemType Directory -Force -Path $claudeConfigDir | Out-Null
 
 # Build the args array
+# Note: mcp-server-bigquery declares its dependency as "mcp>=1.0.0" (no upper bound).
+# Without pinning, uvx resolves the latest mcp (2.0.0), but mcp-server-bigquery does not
+# yet support mcp 2.0's breaking Server API change, causing it to crash on startup with
+# AttributeError: 'Server' object has no attribute 'list_tools'.
+# See https://github.com/likephp-github/bigquery-mcp-setup/issues/2
 $mcpArgs = [System.Collections.Generic.List[string]]@(
-    "mcp-server-bigquery", "--project", $gcpProjectId, "--location", $bqLocation
+    "--with", "mcp<2.0.0", "mcp-server-bigquery", "--project", $gcpProjectId, "--location", $bqLocation
 )
 if (-not [string]::IsNullOrWhiteSpace($bqDataset)) {
     $mcpArgs.Add("--dataset")

@@ -139,6 +139,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-bigquery-mcp.ps1
     "bigquery": {
       "command": "/Users/你的使用者名稱/.local/bin/uvx",
       "args": [
+        "--with", "mcp<2.0.0",
         "mcp-server-bigquery",
         "--project", "your-gcp-project-id",
         "--location", "asia-east1"
@@ -208,12 +209,21 @@ eval "$(/usr/local/bin/brew shellenv)"
 
 ```json
 "args": [
+  "--with", "mcp<2.0.0",
   "mcp-server-bigquery",
   "--project", "your-project",
   "--location", "asia-east1",
   "--dataset", "your_dataset"
 ]
 ```
+
+---
+
+### Q：Claude Desktop 顯示 `bigquery` 連線失敗，log 出現 `AttributeError: 'Server' object has no attribute 'list_tools'`？
+
+**A：** 這是上游 `mcp-server-bigquery` 套件與最新 `mcp` SDK（2.0.0）不相容導致的問題（詳見 [issue #2](https://github.com/likephp-github/bigquery-mcp-setup/issues/2)）。`mcp-server-bigquery` 的依賴宣告沒有版本上限，`uvx` 會解析到不相容的 `mcp` 2.0.0。
+
+v1.14.0 起腳本已自動在 `args` 加入 `--with "mcp<2.0.0"` 鎖定相容版本。若你是舊版腳本安裝的，重新執行一次腳本（會偵測並更新現有設定），或手動在 `claude_desktop_config.json` 的 `bigquery.args` 最前面加入 `"--with", "mcp<2.0.0",` 後重啟 Claude Desktop 即可。
 
 ---
 
@@ -249,6 +259,7 @@ notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| v1.14.0 | 2026-08-04 | 修正 #2 回報問題：mcp-server-bigquery 依賴宣告無版本上限，uvx 會解析到不相容的 mcp 2.0.0 SDK 導致 `AttributeError: 'Server' object has no attribute 'list_tools'`；macOS 與 Windows 腳本寫入設定時皆加上 `--with "mcp<2.0.0"` 鎖定相容版本 |
 | v1.13.0 | 2026-05-05 | 修正 #1 回報問題：偵測 winget 是否存在（Windows Server 沒有），無 winget 時自動下載 Cloud SDK 安裝程式；安裝完成時建立 `C:\tmp` 以解決上游 mcp-server-bigquery 硬編碼路徑；README 標註 Windows 需用 PowerShell 而非 cmd.exe（內部腳本版本升至 2.1.0） |
 | v1.12.0 | 2026-05-05 | Windows 腳本所有訊息改為英文，避免 Windows PowerShell 主控台中文亂碼（內部腳本版本升至 2.0.0） |
 | v1.11.0 | 2026-05-05 | Windows 腳本啟動時新增 OS 平台與 Windows 版本檢查（需 Windows 10 以上） |

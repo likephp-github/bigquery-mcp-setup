@@ -139,6 +139,7 @@ Written content (macOS example):
     "bigquery": {
       "command": "/Users/your-username/.local/bin/uvx",
       "args": [
+        "--with", "mcp<2.0.0",
         "mcp-server-bigquery",
         "--project", "your-gcp-project-id",
         "--location", "asia-east1"
@@ -208,12 +209,21 @@ eval "$(/usr/local/bin/brew shellenv)"
 
 ```json
 "args": [
+  "--with", "mcp<2.0.0",
   "mcp-server-bigquery",
   "--project", "your-project",
   "--location", "asia-east1",
   "--dataset", "your_dataset"
 ]
 ```
+
+---
+
+### Q: Claude Desktop shows the `bigquery` connection failing, and the log has `AttributeError: 'Server' object has no attribute 'list_tools'`.
+
+**A:** This is caused by the upstream `mcp-server-bigquery` package being incompatible with the latest `mcp` SDK (2.0.0) — see [issue #2](https://github.com/likephp-github/bigquery-mcp-setup/issues/2). `mcp-server-bigquery` declares its dependency with no upper bound, so `uvx` resolves an incompatible `mcp` 2.0.0.
+
+Starting with v1.14.0 the script automatically adds `--with "mcp<2.0.0"` to `args` to pin a compatible version. If you installed with an older version of the script, either rerun it (it detects and updates the existing config), or manually add `"--with", "mcp<2.0.0",` at the start of `bigquery.args` in `claude_desktop_config.json` and relaunch Claude Desktop.
 
 ---
 
@@ -249,6 +259,7 @@ The backup file lives in the same directory, named `claude_desktop_config.json.b
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.14.0 | 2026-08-04 | Fixes from issue #2: `mcp-server-bigquery` declares its `mcp` dependency with no upper bound, so `uvx` resolves the incompatible `mcp` 2.0.0 SDK, causing `AttributeError: 'Server' object has no attribute 'list_tools'`; both the macOS and Windows scripts now add `--with "mcp<2.0.0"` when writing the config to pin a compatible version |
 | v1.13.0 | 2026-05-05 | Fixes from issue #1: detect whether `winget` is present (missing on Windows Server) and fall back to downloading the Cloud SDK installer directly; create `C:\tmp` after install to work around the upstream `mcp-server-bigquery` hardcoded `/tmp` log path; README clarifies that Windows commands must run in PowerShell, not `cmd.exe` (internal script version bumped to 2.1.0) |
 | v1.12.0 | 2026-05-05 | Windows script messages translated to English to sidestep Windows PowerShell console mojibake (internal script version bumped to 2.0.0) |
 | v1.11.0 | 2026-05-05 | Windows script now performs OS platform and Windows version checks at startup (requires Windows 10+) |

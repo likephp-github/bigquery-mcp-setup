@@ -15,10 +15,12 @@
 #   v1.6.0  2026-03-21  修正全形字元緊接變數名稱導致 set -u 誤判（unbound variable）
 #   v1.7.0  2026-03-21  移除 env.UV_PYTHON 設定；改用 uv python install 解決 Python 問題
 #   v1.8.0  2026-03-21  新增 realpath 缺失偵測與自動建立替代腳本
+#   v1.9.0  2026-08-04  修正 #2：uvx 執行加上 --with "mcp<2.0.0"，避免解析到與
+#                        mcp-server-bigquery 不相容的 mcp 2.0.0 SDK
 # ============================================================
 
-SCRIPT_VERSION="1.8.0"
-SCRIPT_DATE="2026-03-21"
+SCRIPT_VERSION="1.9.0"
+SCRIPT_DATE="2026-08-04"
 
 # 注意：此腳本為互動式安裝精靈，不使用 set -e（避免任何指令失敗就靜默終止）。
 # 各關鍵步驟皆有明確的錯誤檢查。
@@ -970,9 +972,16 @@ else
 fi
 
 # 組建新的 bigquery MCP 設定區塊
+# 注意：mcp-server-bigquery 依賴宣告為 "mcp>=1.0.0"（無上限），
+# 若不鎖定版本，uvx 會解析到最新的 mcp 2.0.0，
+# 但 mcp-server-bigquery 尚未支援 mcp 2.0 的 breaking change（Server API 變更），
+# 會導致啟動時拋出 AttributeError: 'Server' object has no attribute 'list_tools'。
+# 詳見 https://github.com/likephp-github/bigquery-mcp-setup/issues/2
 NEW_BQ_CONFIG="    \"bigquery\": {
       \"command\": \"$UVX_PATH\",
       \"args\": [
+        \"--with\",
+        \"mcp<2.0.0\",
         \"mcp-server-bigquery\",
         \"--project\",
         \"$GCP_PROJECT_ID\",
@@ -1011,7 +1020,7 @@ if "mcpServers" not in config:
 
 config["mcpServers"]["bigquery"] = {
     "command": "$UVX_PATH",
-    "args": ["mcp-server-bigquery", "--project", "$GCP_PROJECT_ID", "--location", "$BQ_LOCATION"]
+    "args": ["--with", "mcp<2.0.0", "mcp-server-bigquery", "--project", "$GCP_PROJECT_ID", "--location", "$BQ_LOCATION"]
     + (["--dataset", "$BQ_DATASET"] if "$BQ_DATASET" else [])
 }
 
