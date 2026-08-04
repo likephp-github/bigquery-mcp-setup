@@ -223,7 +223,28 @@ eval "$(/usr/local/bin/brew shellenv)"
 
 **A：** 這是上游 `mcp-server-bigquery` 套件與最新 `mcp` SDK（2.0.0）不相容導致的問題（詳見 [issue #2](https://github.com/likephp-github/bigquery-mcp-setup/issues/2)）。`mcp-server-bigquery` 的依賴宣告沒有版本上限，`uvx` 會解析到不相容的 `mcp` 2.0.0。
 
-v1.14.0 起腳本已自動在 `args` 加入 `--with "mcp<2.0.0"` 鎖定相容版本。若你是舊版腳本安裝的，重新執行一次腳本（會偵測並更新現有設定），或手動在 `claude_desktop_config.json` 的 `bigquery.args` 最前面加入 `"--with", "mcp<2.0.0",` 後重啟 Claude Desktop 即可。
+v1.14.0 起腳本已自動在 `args` 加入 `--with "mcp<2.0.0"` 鎖定相容版本。若你是舊版腳本安裝的，建議重新執行一次腳本（會偵測並更新現有設定），它會用正確的順序覆寫。
+
+若要手動修正，打開 `claude_desktop_config.json`，把 `bigquery.args` 改成以下順序（`your-project`、`asia-east1`、`your-dataset` 換成你自己的設定，沒有指定 dataset 就拿掉最後兩個元素）：
+
+```json
+"bigquery": {
+  "command": "/path/to/uvx",
+  "args": [
+    "--with", "mcp<2.0.0",
+    "mcp-server-bigquery",
+    "--project", "your-project",
+    "--location", "asia-east1",
+    "--dataset", "your-dataset"
+  ]
+}
+```
+
+⚠️ 兩個常見手動編輯錯誤，都會讓 `mcp-server-bigquery` 直接噴 `unrecognized arguments: --with ...`：
+- **順序錯了**：`--with "mcp<2.0.0"` 必須放在 `mcp-server-bigquery` **之前**。放在後面的話，uvx 不會把它當自己的旗標，而是原封不動傳給 `mcp-server-bigquery` 的 CLI，它當然不認得就報錯。
+- **方向錯了**：是 `mcp<2.0.0`（鎖定在 2.0.0 以下），不是 `mcp>2.0.0`——上游套件目前還不支援 `mcp` 2.0 的 breaking change，所以要鎖住上限而不是下限。
+
+改完存檔後，記得完全關閉 Claude Desktop（Windows 可到工作管理員確認沒有殘留的 `Claude.exe` / `uvx.exe` 行程）再重新開啟。
 
 ---
 

@@ -223,7 +223,28 @@ eval "$(/usr/local/bin/brew shellenv)"
 
 **A:** This is caused by the upstream `mcp-server-bigquery` package being incompatible with the latest `mcp` SDK (2.0.0) — see [issue #2](https://github.com/likephp-github/bigquery-mcp-setup/issues/2). `mcp-server-bigquery` declares its dependency with no upper bound, so `uvx` resolves an incompatible `mcp` 2.0.0.
 
-Starting with v1.14.0 the script automatically adds `--with "mcp<2.0.0"` to `args` to pin a compatible version. If you installed with an older version of the script, either rerun it (it detects and updates the existing config), or manually add `"--with", "mcp<2.0.0",` at the start of `bigquery.args` in `claude_desktop_config.json` and relaunch Claude Desktop.
+Starting with v1.14.0 the script automatically adds `--with "mcp<2.0.0"` to `args` to pin a compatible version. If you installed with an older version of the script, rerun it — it detects and updates the existing config with the correct order.
+
+To fix it manually, open `claude_desktop_config.json` and set `bigquery.args` to this order (replace `your-project`, `asia-east1`, `your-dataset` with your own values; drop the last two elements if you don't use a dataset filter):
+
+```json
+"bigquery": {
+  "command": "/path/to/uvx",
+  "args": [
+    "--with", "mcp<2.0.0",
+    "mcp-server-bigquery",
+    "--project", "your-project",
+    "--location", "asia-east1",
+    "--dataset", "your-dataset"
+  ]
+}
+```
+
+⚠️ Two common manual-edit mistakes both make `mcp-server-bigquery` fail with `unrecognized arguments: --with ...`:
+- **Wrong order**: `--with "mcp<2.0.0"` must come *before* `mcp-server-bigquery`. If it comes after, uvx won't treat it as its own flag — it passes it straight through to `mcp-server-bigquery`'s own CLI, which doesn't recognize it and errors out.
+- **Wrong direction**: it's `mcp<2.0.0` (pin below 2.0.0), not `mcp>2.0.0` — the upstream package doesn't yet support `mcp` 2.0's breaking change, so you need an upper bound, not a lower one.
+
+After saving, fully quit Claude Desktop (on Windows, check Task Manager for lingering `Claude.exe` / `uvx.exe` processes) and relaunch it.
 
 ---
 
